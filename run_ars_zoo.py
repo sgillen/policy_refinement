@@ -12,9 +12,8 @@ import pandas as pd
 from functools import partial
 
 from seagul.rl.ars.ars_zoo import ARSZooAgent
-from seagul.mesh import mdim_div_stable, mesh_dim, mesh_find_target_d
-from seagul.rollouts import do_rollout_stable
-from seagul.rollouts import load_zoo_agent
+from seagul.mesh import mdim_div_stable, mesh_dim, mesh_find_target_d, mdim_div_stable_nolen, cdim_div_stable_nolen
+from seagul.zoo3_utils import do_rollout_stable,  load_zoo_agent
 
 
 torch.set_default_dtype(torch.float32)
@@ -24,16 +23,34 @@ from ray import tune
 def training_function(config):
     import pybullet_envs
 
-    train, env_name, algo = config["train"], config["env_name"], config["algo"]
-    ars_iters, num_trials, mdim_kwargs = config["ars_iters"], config["mdim_trials"], config["mdim_kwargs"]
+    env_name, algo = config["env_name"], config["algo"]
+    ars_iters, num_trials = config["ars_iters"], config["mdim_trials"]
+    mdim_kwargs, post = config["mdim_kwargs"], config["post"]
     env, model = load_zoo_agent(env_name, algo)
+    agent_folder = config['agent_folder']
 
     
-    if train:
-        mdim_post = partial(mdim_div_stable, mdim_kwargs=mdim_kwargs)
-        new_agent = ARSZooAgent(env_name, algo, n_workers=8, n_delta=64, postprocessor=mdim_post, step_schedule=[0.025, 0.0025],  exp_schedule=[0.025, 0.0025])
-        new_agent.learn(ars_iters, verbose=False)
+    if post is not None:
+
+        print("Here!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!11")
+        
+        new_agent = ARSZooAgent(env_name, algo, n_workers=24, n_delta=72, postprocessor=post, step_schedule=[0.05, 0.005],  exp_schedule=[0.05, 0.005])
+        new_agent.learn(ars_iters, verbose=True)
         model = new_agent.model
+
+        post_name = post.__name__
+        print(post_name)
+        os.makedirs(f"{agent_folder}/{env_name}", exist_ok=True)
+        model.save(f"{agent_folder}/{env_name}/{post_name}.pkl")
+
+        print(os.path.dirname(os.path.realpath(__file__)))
+
+        print(f"{agent_folder}/{env_name}")
+        print(f"{agent_folder}/{env_name}/{post_name}.pkl")
+        print("Here!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!22")
+        
+    else:
+        post_name = 'iden'
 
     mdim_arr = np.zeros(num_trials)
     cdim_arr = np.zeros(num_trials)
@@ -57,11 +74,6 @@ def training_function(config):
             mdim_arr[i] = np.nan
             cdim_arr[i] = np.nan
 
-
-        # try:
-        #     dcrit_arr[i] = mesh_find_target_d(o_mdim)
-        # except:
-        #     dcrit_arr[i] = np.nan
             
 
     tune.report(mdim_mean =     mdim_arr.mean(),
@@ -76,34 +88,65 @@ def training_function(config):
                 nreward_std =   nrew_arr.std(),
                 ureward_mean =  urew_arr.mean(),
                 ureward_std =   urew_arr.std(),
-                # dcrit_mean =    dcrit_arr.mean(),
-                # dcrit_std =     dcrit_arr.std(),
+                post = post_name,
                 len_mean = len_arr.mean())
 
 
 
 if __name__ == "__main__":
-    csv_name = input("Output file name: ")
 
-    if os.path.exists(csv_name):
-        input(f"Filename {csv_name} already exists, overwrite?")
+    csv_folder_name = "test_out"
+    agent_folder_name = "test_agent"
+    root_folder = os.path.dirname(os.path.realpath(__file__))
 
+    output_name = input("Output file name: ")
+
+    csv_filename = f"{root_folder}/{csv_folder_name}/{output_name}.csv"
+    agent_folder = f"{root_folder}/{agent_folder_name}/{output_name}/"
+
+    print(os.getcwd())
+    input(f"will save csv in {csv_filename}, agents in {agent_folder}    ok?") 
+    if os.path.exists(csv_filename):
+        input(f"Filename  already exists, overwrite?")
+
+    mdim_kwargs= {"upper_size_ratio":1.0, "lower_size_ratio":0.0}
+
+    
 
     analysis = tune.run(
         training_function,
         config={
             "ars_iters": 100,
             "mdim_trials": 10,
-            "mdim_kwargs": {"upper_size_ratio":1.0, "lower_size_ratio":0.0},
-            "train" : tune.grid_search([False]),
-            "env_name": tune.grid_search(["Walker2DBulletEnv-v0","HalfCheetahBulletEnv-v0","HopperBulletEnv-v0", "AntBulletEnv-v0", "ReacherBulletEnv-v0"]),
-            "algo": tune.grid_search(['ppo', 'a2c', 'td3', 'sac','ddpg', 'tqc'])
+            "post" : tune.grid_search([None, mdim_div_stable]),
+            "mdim_kwargs" : mdim_kwargs,
+            "agent_folder": agent_folder,
+            "env_name": tune.grid_search(["Walker2DBulletEnv-v0"]),
+            "algo": tune.grid_search(['ppo'])
         },
-        resources_per_trial= {"cpu": 8},
+        resources_per_trial= {"cpu": 24},
         verbose=2,
     )
-        
+
+
+
+    # analysis = tune.run(
+    #     training_function,
+    #     config={
+    #         "ars_iters": 100,
+    #         "mdim_trials": 10,
+    #         "post" : tune.grid_search([None, mdim_div_stable_nolen, cdim_div_stable_nolen]),
+    #         "mdim_kwargs" : mdim_kwargs,
+    #         "agent_folder": agent_folder,
+    #         "env_name": tune.grid_search(["Walker2DBulletEnv-v0","HalfCheetahBulletEnv-v0","HopperBulletEnv-v0", "AntBulletEnv-v0", "ReacherBulletEnv-v0"]),
+    #         "algo": tune.grid_search(['ppo', 'td3', 'sac', 'tqc'])
+    #     },
+    #     resources_per_trial= {"cpu": 8},
+    #     verbose=2,
+    # )
+
+    # partial(mdim_div_stable, mdim_kwargs=mdim_kwargs),
         
     # Get a dataframe for analyzing trial results.
     df = analysis.results_df
-    analysis.results_df.to_csv(csv_name)
+    analysis.results_df.to_csv(csv_filename)

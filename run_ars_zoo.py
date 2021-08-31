@@ -32,9 +32,7 @@ def training_function(config):
     
     if post is not None:
 
-        print("Here!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!11")
-        
-        new_agent = ARSZooAgent(env_name, algo, n_workers=24, n_delta=72, postprocessor=post, step_schedule=[0.05, 0.005],  exp_schedule=[0.05, 0.005])
+        new_agent = ARSZooAgent(env_name, algo, n_workers=8, n_delta=64, postprocessor=post, step_schedule=[0.05, 0.005],  exp_schedule=[0.05, 0.005])
         new_agent.learn(ars_iters, verbose=True)
         model = new_agent.model
 
@@ -44,10 +42,6 @@ def training_function(config):
         model.save(f"{agent_folder}/{env_name}/{post_name}.pkl")
 
         print(os.path.dirname(os.path.realpath(__file__)))
-
-        print(f"{agent_folder}/{env_name}")
-        print(f"{agent_folder}/{env_name}/{post_name}.pkl")
-        print("Here!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!22")
         
     else:
         post_name = 'iden'
@@ -67,7 +61,8 @@ def training_function(config):
         urew_arr[i] = info[0]['episode']['r']
         len_arr[i] =  info[0]['episode']['l']
 
-        o_mdim  = o[200:]
+        #o_mdim  = o[200:]
+        o_mdim = o
         try:
             mdim_arr[i], cdim_arr[i], _, _ = mesh_dim(o_mdim, **mdim_kwargs)
         except:
@@ -113,23 +108,6 @@ if __name__ == "__main__":
 
     
 
-    analysis = tune.run(
-        training_function,
-        config={
-            "ars_iters": 100,
-            "mdim_trials": 10,
-            "post" : tune.grid_search([None, mdim_div_stable]),
-            "mdim_kwargs" : mdim_kwargs,
-            "agent_folder": agent_folder,
-            "env_name": tune.grid_search(["Walker2DBulletEnv-v0"]),
-            "algo": tune.grid_search(['ppo'])
-        },
-        resources_per_trial= {"cpu": 24},
-        verbose=2,
-    )
-
-
-
     # analysis = tune.run(
     #     training_function,
     #     config={
@@ -138,12 +116,31 @@ if __name__ == "__main__":
     #         "post" : tune.grid_search([None, mdim_div_stable_nolen, cdim_div_stable_nolen]),
     #         "mdim_kwargs" : mdim_kwargs,
     #         "agent_folder": agent_folder,
-    #         "env_name": tune.grid_search(["Walker2DBulletEnv-v0","HalfCheetahBulletEnv-v0","HopperBulletEnv-v0", "AntBulletEnv-v0", "ReacherBulletEnv-v0"]),
-    #         "algo": tune.grid_search(['ppo', 'td3', 'sac', 'tqc'])
+    #         "env_name": tune.grid_search(["Walker2DBulletEnv-v0", "HalfCheetahBulletEnv-v0", "W"]),
+    #         "algo": tune.grid_search(['ppo'])
     #     },
-    #     resources_per_trial= {"cpu": 8},
+    #     resources_per_trial= {"cpu": 24},
     #     verbose=2,
+    #     fail_fast=True,
     # )
+
+
+
+    analysis = tune.run(
+        training_function,
+        config={
+            "ars_iters": 100,
+            "mdim_trials": 10,
+            "post" : tune.grid_search([None, mdim_div_stable_nolen, cdim_div_stable_nolen]),
+            "mdim_kwargs" : mdim_kwargs,
+            "agent_folder": agent_folder,
+            "env_name": tune.grid_search(["Walker2DBulletEnv-v0","HalfCheetahBulletEnv-v0","HopperBulletEnv-v0", "AntBulletEnv-v0", "ReacherBulletEnv-v0"]),
+            "algo": tune.grid_search(['ppo', 'td3', 'sac', 'tqc'])
+        },
+        resources_per_trial= {"cpu": 8},
+        verbose=2,
+        fail_fast=True,
+    )
 
     # partial(mdim_div_stable, mdim_kwargs=mdim_kwargs),
         

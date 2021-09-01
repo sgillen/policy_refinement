@@ -10,9 +10,9 @@ import copy
 import pybullet_envs
 import pandas as pd
 from functools import partial
-
+import collections
 from seagul.rl.ars.ars_zoo import ARSZooAgent
-from seagul.mesh import mdim_div_stable, mesh_dim, mesh_find_target_d, mdim_div_stable_nolen, cdim_div_stable_nolen, mdim_div_panda, cdim_div_panda
+from seagul.mesh import dict_to_array, DualRewardDiv, mdim_safe_stable_nolen, cdim_safe_stable_nolen
 from seagul.zoo3_utils import do_rollout_stable,  load_zoo_agent
 
 
@@ -56,19 +56,10 @@ def training_function(config):
     rew_arr = np.zeros(num_trials)
     
     for j in range(num_trials):
-        odict,a,r,l = do_rollout_stable(env, model)
-        
-        o_list = []
-        ach_list = []
-        des_list = []
-        for thing in odict:
-            o_list.append(thing['observation'])
-            ach_list.append(thing['achieved_goal'])
-            des_list.append(thing['desired_goal'])
-    
-        o = np.stack(o_list).squeeze()
-        ach = np.stack(ach_list).squeeze()
-        des = np.stack(des_list).squeeze()
+        o,a,r,l = do_rollout_stable(env, model)
+
+        if type(o[0]) == collections.OrderedDict:
+            o,_,_ = dict_to_array(o)
 
         
         o_norm = o
@@ -153,13 +144,15 @@ if __name__ == "__main__":
     #     fail_fast=True,
     # )
 
+    mdim_div = DualRewardDiv(mdim_safe_stable_nolen)
+    cdim_div = DualRewardDiv(cdim_safe_stable_nolen)
 
     analysis = tune.run(
         training_function,
         config={
             "ars_iters": 100,
             "mdim_trials": 10,
-            "post" : tune.grid_search([None, mdim_div_panda, cdim_div_panda]),
+            "post" : tune.grid_search([None, mdim_div, cdim_div]),
             "agent_folder": agent_folder,
             "env_name": tune.grid_search(["PandaReach-v1", "PandaPickAndPlace-v1", "PandaPush-v1", "PandaSlide-v1", "PandaStack-v1", "FetchReach-v1", "FetchPickAndPlace-v1", "FetchPush-v1", "FetchSlide-v1"]),
             "algo": tune.grid_search(['tqc'])

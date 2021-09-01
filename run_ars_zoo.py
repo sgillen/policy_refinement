@@ -12,7 +12,7 @@ import pandas as pd
 from functools import partial
 
 from seagul.rl.ars.ars_zoo import ARSZooAgent
-from seagul.mesh import mdim_div_stable, mesh_dim, mesh_find_target_d, mdim_div_stable_nolen, cdim_div_stable_nolen
+from seagul.mesh import mdim_div_stable, mesh_dim, mesh_find_target_d, mdim_div_stable_nolen, cdim_div_stable_nolen, mdim_div_panda, cdim_div_panda
 from seagul.zoo3_utils import do_rollout_stable,  load_zoo_agent
 
 
@@ -25,7 +25,7 @@ def training_function(config):
 
     env_name, algo = config["env_name"], config["algo"]
     ars_iters, num_trials = config["ars_iters"], config["mdim_trials"]
-    mdim_kwargs, post = config["mdim_kwargs"], config["post"]
+    post = config["post"]
     env, model = load_zoo_agent(env_name, algo)
     agent_folder = config['agent_folder']
 
@@ -38,10 +38,11 @@ def training_function(config):
 
         post_name = post.__name__
         print(post_name)
-        os.makedirs(f"{agent_folder}/{env_name}", exist_ok=True)
-        model.save(f"{agent_folder}/{env_name}/{post_name}.pkl")
 
-        print(os.path.dirname(os.path.realpath(__file__)))
+        os.makedirs(f"{agent_folder}/{algo}/{env_name}", exist_ok=True)
+        model.save(f"{agent_folder}/{algo}/{env_name}/{post_name}.pkl")
+
+
         
     else:
         post_name = 'iden'
@@ -53,21 +54,31 @@ def training_function(config):
     urew_arr = np.zeros(num_trials)
     len_arr = np.zeros(num_trials)
     rew_arr = np.zeros(num_trials)
-    dcrit_arr = np.zeros(num_trials)
     
-    for i in range(num_trials):
-        o,a,r,info = do_rollout_stable(env, model)
-        nrew_arr[i] = np.sum(r)
-        urew_arr[i] = info[0]['episode']['r']
-        len_arr[i] =  info[0]['episode']['l']
+    for j in range(num_trials):
+        odict,a,r,l = do_rollout_stable(env, model)
+        
+        o_list = []
+        ach_list = []
+        des_list = []
+        for thing in odict:
+            o_list.append(thing['observation'])
+            ach_list.append(thing['achieved_goal'])
+            des_list.append(thing['desired_goal'])
+    
+        o = np.stack(o_list).squeeze()
+        ach = np.stack(ach_list).squeeze()
+        des = np.stack(des_list).squeeze()
 
-        #o_mdim  = o[200:]
-        o_mdim = o
+        
+        o_norm = o
+        #o_norm  = o_norm[200:]
+        rew_arr[j] = np.sum(r)
         try:
-            mdim_arr[i], cdim_arr[i], _, _ = mesh_dim(o_mdim, **mdim_kwargs)
+            mdim_arr[j], cdim_arr[j], _, _ = mesh_dim(o_norm)
         except:
-            mdim_arr[i] = np.nan
-            cdim_arr[i] = np.nan
+            mdim_arr[j] = np.nan
+            cdim_arr[j] = np.nan
 
             
 
@@ -126,22 +137,39 @@ if __name__ == "__main__":
 
 
 
+    # analysis = tune.run(
+    #     training_function,
+    #     config={
+    #         "ars_iters": 100,
+    #         "mdim_trials": 10,
+    #         "post" : tune.grid_search([None, mdim_div_stable_nolen, cdim_div_stable_nolen]),
+    #         "mdim_kwargs" : mdim_kwargs,
+    #         "agent_folder": agent_folder,
+    #         "env_name": tune.grid_search(["Walker2DBulletEnv-v0","HalfCheetahBulletEnv-v0","HopperBulletEnv-v0", "AntBulletEnv-v0", "ReacherBulletEnv-v0"]),
+    #         "algo": tune.grid_search(['ppo', 'td3', 'sac', 'tqc'])
+    #     },
+    #     resources_per_trial= {"cpu": 8},
+    #     verbose=2,
+    #     fail_fast=True,
+    # )
+
+
     analysis = tune.run(
         training_function,
         config={
             "ars_iters": 100,
             "mdim_trials": 10,
-            "post" : tune.grid_search([None, mdim_div_stable_nolen, cdim_div_stable_nolen]),
-            "mdim_kwargs" : mdim_kwargs,
+            "post" : tune.grid_search([None, mdim_div_panda, cdim_div_panda]),
             "agent_folder": agent_folder,
-            "env_name": tune.grid_search(["Walker2DBulletEnv-v0","HalfCheetahBulletEnv-v0","HopperBulletEnv-v0", "AntBulletEnv-v0", "ReacherBulletEnv-v0"]),
-            "algo": tune.grid_search(['ppo', 'td3', 'sac', 'tqc'])
+            "env_name": tune.grid_search(["PandaReach-v1", "PandaPickAndPlace-v1", "PandaPush-v1", "PandaSlide-v1", "PandaStack-v1", "FetchReach-v1", "FetchPickAndPlace-v1", "FetchPush-v1", "FetchSlide-v1"]),
+            "algo": tune.grid_search(['tqc'])
         },
         resources_per_trial= {"cpu": 8},
         verbose=2,
         fail_fast=True,
     )
 
+    
     # partial(mdim_div_stable, mdim_kwargs=mdim_kwargs),
         
     # Get a dataframe for analyzing trial results.

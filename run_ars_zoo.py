@@ -11,8 +11,8 @@ import pybullet_envs
 import pandas as pd
 from functools import partial
 import collections
-from seagul.rl.ars.ars_zoo import ARSZooAgent
-from seagul.mesh import dict_to_array, DualRewardDiv, mdim_safe_stable_nolen, cdim_safe_stable_nolen
+from seagul.rl.ars.ars_zoo import ARSZooAgent, postprocess_default
+from seagul.mesh import dict_to_array, DualRewardDiv,DualRewardProd, mdim_safe_stable_nolen, cdim_safe_stable_nolen, mesh_dim
 from seagul.zoo3_utils import do_rollout_stable,  load_zoo_agent
 
 
@@ -32,7 +32,7 @@ def training_function(config):
     
     if post is not None:
 
-        new_agent = ARSZooAgent(env_name, algo, n_workers=8, n_delta=64, postprocessor=post, step_schedule=[0.05, 0.005],  exp_schedule=[0.05, 0.005])
+        new_agent = ARSZooAgent(env_name, algo, n_workers=8, n_delta=64, postprocessor=post, step_schedule=[0.01, 0.001],  exp_schedule=[0.01, 0.001])
         new_agent.learn(ars_iters, verbose=True)
         model = new_agent.model
 
@@ -53,7 +53,6 @@ def training_function(config):
     nrew_arr = np.zeros(num_trials)
     urew_arr = np.zeros(num_trials)
     len_arr = np.zeros(num_trials)
-    rew_arr = np.zeros(num_trials)
     
     for j in range(num_trials):
         o,a,r,l = do_rollout_stable(env, model)
@@ -64,7 +63,10 @@ def training_function(config):
         
         o_norm = o
         #o_norm  = o_norm[200:]
-        rew_arr[j] = np.sum(r)
+
+        urew_arr[j] = l[0]['episode']['r']
+        len_arr[j] =  l[0]['episode']['l']
+        nrew_arr[j] = np.sum(r)
         try:
             mdim_arr[j], cdim_arr[j], _, _ = mesh_dim(o_norm)
         except:
@@ -144,27 +146,32 @@ if __name__ == "__main__":
     #     fail_fast=True,
     # )
 
-    mdim_div = DualRewardDiv(mdim_safe_stable_nolen)
-    cdim_div = DualRewardDiv(cdim_safe_stable_nolen)
+    mdim_div = DualRewardProd(mdim_safe_stable_nolen)
+    cdim_div = DualRewardProd(cdim_safe_stable_nolen)
 
     analysis = tune.run(
         training_function,
         config={
-            "ars_iters": 100,
+            "ars_iters": 200,
             "mdim_trials": 10,
-            "post" : tune.grid_search([None, mdim_div, cdim_div]),
+            "post" : tune.grid_search([None, postprocess_default]),
             "agent_folder": agent_folder,
-            "env_name": tune.grid_search(["PandaReach-v1", "PandaPickAndPlace-v1", "PandaPush-v1", "PandaSlide-v1", "PandaStack-v1", "FetchReach-v1", "FetchPickAndPlace-v1", "FetchPush-v1", "FetchSlide-v1"]),
-            "algo": tune.grid_search(['tqc'])
+            "env_name": tune.grid_search(["Walker2DBulletEnv-v0","HalfCheetahBulletEnv-v0","HopperBulletEnv-v0", "AntBulletEnv-v0", "ReacherBulletEnv-v0"]),
+            "algo": tune.grid_search(['ppo', 'td3', 'sac', 'tqc'])
         },
         resources_per_trial= {"cpu": 8},
         verbose=2,
         fail_fast=True,
     )
 
-    
+
+
+    #"env_name": tune.grid_search(["PandaReach-v1", "PandaPickAndPlace-v1", "PandaPush-v1", "PandaSlide-v1", "PandaStack-v1", "FetchReach-v1", "FetchPickAndPlace-v1", "FetchPush-v1", "FetchSlide-v1"]),
+    #"algo": tune.grid_search(['tqc'])
+            
     # partial(mdim_div_stable, mdim_kwargs=mdim_kwargs),
         
     # Get a dataframe for analyzing trial results.
     df = analysis.results_df
     analysis.results_df.to_csv(csv_filename)
+    print(f"saved in {csv_filename}")

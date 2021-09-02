@@ -12,7 +12,7 @@ import pandas as pd
 from functools import partial
 import collections
 from seagul.rl.ars.ars_zoo import ARSZooAgent, postprocess_default
-from seagul.mesh import dict_to_array, DualRewardDiv,DualRewardProd, mdim_safe_stable_nolen, cdim_safe_stable_nolen, mesh_dim
+from seagul.mesh import dict_to_array, DualRewardDiv,DualRewardProd,DualRewardLin,  adim_safe_stable_nolen, mdim_safe_stable_nolen, cdim_safe_stable_nolen, mesh_dim
 from seagul.zoo3_utils import do_rollout_stable,  load_zoo_agent
 
 
@@ -32,7 +32,7 @@ def training_function(config):
     
     if post is not None:
 
-        new_agent = ARSZooAgent(env_name, algo, n_workers=8, n_delta=64, postprocessor=post, step_schedule=[0.01, 0.001],  exp_schedule=[0.01, 0.001])
+        new_agent = ARSZooAgent(env_name, algo, n_workers=8, n_delta=64, postprocessor=post, step_schedule=[0.02, 0.002],  exp_schedule=[0.025, 0.0025])
         new_agent.learn(ars_iters, verbose=True)
         model = new_agent.model
 
@@ -146,27 +146,33 @@ if __name__ == "__main__":
     #     fail_fast=True,
     # )
 
-    mdim_div = DualRewardProd(mdim_safe_stable_nolen)
-    cdim_div = DualRewardProd(cdim_safe_stable_nolen)
+    mdim_prod = DualRewardProd(mdim_safe_stable_nolen)
+    cdim_prod = DualRewardProd(cdim_safe_stable_nolen)
+    adim_prod = DualRewardProd(adim_safe_stable_nolen)
+
+    mdim_lin = DualRewardLin(mdim_safe_stable_nolen, 10, 1)
+    cdim_lin = DualRewardLin(cdim_safe_stable_nolen, 10, .1)
+    adim_lin = DualRewardLin(adim_safe_stable_nolen, 10, .5)
+
 
     analysis = tune.run(
         training_function,
         config={
             "ars_iters": 200,
             "mdim_trials": 10,
-            "post" : tune.grid_search([None, postprocess_default]),
             "agent_folder": agent_folder,
-            "env_name": tune.grid_search(["Walker2DBulletEnv-v0","HalfCheetahBulletEnv-v0","HopperBulletEnv-v0", "AntBulletEnv-v0", "ReacherBulletEnv-v0"]),
-            "algo": tune.grid_search(['ppo', 'td3', 'sac', 'tqc'])
+            "env_name": tune.grid_search(["PandaReach-v1", "PandaPickAndPlace-v1", "PandaPush-v1", "PandaSlide-v1", "PandaStack-v1", "FetchReach-v1", "FetchPickAndPlace-v1", "FetchPush-v1", "FetchSlide-v1"]),
+            "post" : tune.grid_search([None, postprocess_default, mdim_prod, cdim_prod, adim_prod, mdim_lin, cdim_lin, adim_lin]),
+            "algo": tune.grid_search(['tqc'])
         },
         resources_per_trial= {"cpu": 8},
         verbose=2,
         fail_fast=True,
     )
 
+    #"env_name": tune.grid_search(["Walker2DBulletEnv-v0","HalfCheetahBulletEnv-v0","HopperBulletEnv-v0", "AntBulletEnv-v0", "ReacherBulletEnv-v0"]),
 
 
-    #"env_name": tune.grid_search(["PandaReach-v1", "PandaPickAndPlace-v1", "PandaPush-v1", "PandaSlide-v1", "PandaStack-v1", "FetchReach-v1", "FetchPickAndPlace-v1", "FetchPush-v1", "FetchSlide-v1"]),
     #"algo": tune.grid_search(['tqc'])
             
     # partial(mdim_div_stable, mdim_kwargs=mdim_kwargs),

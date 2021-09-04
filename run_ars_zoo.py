@@ -150,9 +150,33 @@ if __name__ == "__main__":
     cdim_prod = DualRewardProd(cdim_safe_stable_nolen)
     adim_prod = DualRewardProd(adim_safe_stable_nolen)
 
-    mdim_lin = DualRewardLin(mdim_safe_stable_nolen, 10, 1)
-    cdim_lin = DualRewardLin(cdim_safe_stable_nolen, 10, .1)
-    adim_lin = DualRewardLin(adim_safe_stable_nolen, 10, .5)
+    def neg_mdim(o,a,r):
+        return -mdim_safe_stable_nolen(o,a,r)
+
+    def neg_adim(o,a,r):
+        return -adim_safe_stable_nolen(o,a,r)
+
+    
+    mdim_lin = DualRewardLin(neg_mdim, 10, 1)
+    #cdim_lin = DualRewardLin(cdim_safe_stable_nolen, 10, .1)
+    adim_lin = DualRewardLin(neg_adim, 10, .5)
+
+
+    # analysis = tune.run(
+    #     training_function,
+    #     config={
+    #         "ars_iters": 200,
+    #         "mdim_trials": 10,
+    #         "agent_folder": agent_folder,
+    #         "env_name": tune.grid_search(["PandaReach-v1", "PandaPickAndPlace-v1", "PandaPush-v1", "PandaSlide-v1", "PandaStack-v1"]),
+    #         "post" : tune.grid_search([None, postprocess_default, mdim_prod, adim_prod]),#, mdim_lin, adim_lin]),
+    #         "algo": tune.grid_search(['tqc'])
+    #     },
+    #     resources_per_trial= {"cpu": 8},
+    #     verbose=2,
+    #     fail_fast=True,
+    # )
+
 
 
     analysis = tune.run(
@@ -161,15 +185,16 @@ if __name__ == "__main__":
             "ars_iters": 200,
             "mdim_trials": 10,
             "agent_folder": agent_folder,
-            "env_name": tune.grid_search(["PandaReach-v1", "PandaPickAndPlace-v1", "PandaPush-v1", "PandaSlide-v1", "PandaStack-v1", "FetchReach-v1", "FetchPickAndPlace-v1", "FetchPush-v1", "FetchSlide-v1"]),
-            "post" : tune.grid_search([None, postprocess_default, mdim_prod, cdim_prod, adim_prod, mdim_lin, cdim_lin, adim_lin]),
-            "algo": tune.grid_search(['tqc'])
+            "env_name": tune.grid_search(["Pendulum-v0", "MountainCarContinuous-v0"]),
+            "post" : tune.grid_search([None, postprocess_default]),
+            "algo": tune.grid_search(['a2c', 'ppo', 'ddpg', 'sac', 'td3','tqc'])
         },
         resources_per_trial= {"cpu": 8},
         verbose=2,
         fail_fast=True,
     )
 
+    
     #"env_name": tune.grid_search(["Walker2DBulletEnv-v0","HalfCheetahBulletEnv-v0","HopperBulletEnv-v0", "AntBulletEnv-v0", "ReacherBulletEnv-v0"]),
 
 

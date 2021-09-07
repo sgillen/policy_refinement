@@ -12,7 +12,7 @@ import pandas as pd
 from functools import partial
 import collections
 from seagul.rl.ars.ars_zoo import ARSZooAgent, postprocess_default
-from seagul.mesh import dict_to_array, DualRewardDiv,DualRewardProd,DualRewardLin,  adim_safe_stable_nolen, mdim_safe_stable_nolen, cdim_safe_stable_nolen, mesh_dim
+from seagul.mesh import dict_to_array, act_squared, DualRewardDiv,DualRewardProd,DualRewardLin,  adim_safe_stable_nolen, mdim_safe_stable_nolen, cdim_safe_stable_nolen, mesh_dim
 from seagul.zoo3_utils import do_rollout_stable,  load_zoo_agent
 
 
@@ -26,23 +26,25 @@ def training_function(config):
     env_name, algo = config["env_name"], config["algo"]
     ars_iters, num_trials = config["ars_iters"], config["mdim_trials"]
     post = config["post"]
-    env, model = load_zoo_agent(env_name, algo)
-    agent_folder = config['agent_folder']
+    
+    if ((algo == "ddpg") and (env_name == "BipedalWalkerHardcore-v3")):
+        return
 
     
+    env, model = load_zoo_agent(env_name, algo)
+    agent_folder = config['agent_folder']
+    
+    
     if post is not None:
-
-        new_agent = ARSZooAgent(env_name, algo, n_workers=8, n_delta=64, postprocessor=post, step_schedule=[0.02, 0.002],  exp_schedule=[0.025, 0.0025])
+        new_agent = ARSZooAgent(env_name, algo, n_workers=8, n_delta=64, postprocessor=post, step_schedule=[0.02, 0.002],  exp_schedule=[0.025, 0.0025], train_all=True, epoch_seed=True)
         new_agent.learn(ars_iters, verbose=True)
         model = new_agent.model
-
+        
         post_name = post.__name__
         print(post_name)
-
+        
         os.makedirs(f"{agent_folder}/{algo}/{env_name}", exist_ok=True)
         model.save(f"{agent_folder}/{algo}/{env_name}/{post_name}.pkl")
-
-
         
     else:
         post_name = 'iden'
@@ -74,7 +76,6 @@ def training_function(config):
             cdim_arr[j] = np.nan
 
             
-
     tune.report(mdim_mean =     mdim_arr.mean(),
                 mdim_std =      mdim_arr.std(),
                 mdim_nan_mean = np.nanmean(mdim_arr),
@@ -150,16 +151,12 @@ if __name__ == "__main__":
     cdim_prod = DualRewardProd(cdim_safe_stable_nolen)
     adim_prod = DualRewardProd(adim_safe_stable_nolen)
 
-    def neg_mdim(o,a,r):
-        return -mdim_safe_stable_nolen(o,a,r)
-
-    def neg_adim(o,a,r):
-        return -adim_safe_stable_nolen(o,a,r)
-
-    
-    mdim_lin = DualRewardLin(neg_mdim, 10, 1)
+    a2_lin = DualRewardLin(act_squared, 1, -.2)
+    a1_lin = DualRewardLin(act_squared, 1, -.1)
+    a5_lin = DualRewardLin(act_squared, 1, -.5)
+    #mdim_lin = DualRewardLin(neg_mdim, 10, 1)
     #cdim_lin = DualRewardLin(cdim_safe_stable_nolen, 10, .1)
-    adim_lin = DualRewardLin(neg_adim, 10, .5)
+    #adim_lin = DualRewardLin(neg_adim, 10, .5)
 
 
     # analysis = tune.run(
@@ -169,7 +166,7 @@ if __name__ == "__main__":
     #         "mdim_trials": 10,
     #         "agent_folder": agent_folder,
     #         "env_name": tune.grid_search(["PandaReach-v1", "PandaPickAndPlace-v1", "PandaPush-v1", "PandaSlide-v1", "PandaStack-v1"]),
-    #         "post" : tune.grid_search([None, postprocess_default, mdim_prod, adim_prod]),#, mdim_lin, adim_lin]),
+    #         "post" : tune.grid_search([None, postprocess_default, adim_prod, a2_lin]),#, mdim_lin, adim_lin]),
     #         "algo": tune.grid_search(['tqc'])
     #     },
     #     resources_per_trial= {"cpu": 8},
@@ -178,6 +175,23 @@ if __name__ == "__main__":
     # )
 
 
+    # analysis = tune.run(
+    #     training_function,
+    #     config={
+    #         "ars_iters": 200,
+    #         "mdim_trials": 10,
+    #         "agent_folder": agent_folder,
+    #         "env_name": tune.grid_search(["FetchReach-v1", "FetchPickAndPlace-v1", "FetchPush-v1", "FetchSlide-v1"]),
+    #         "post" : tune.grid_search([None, postprocess_default]),#, mdim_lin, adim_lin]),
+    #         "algo": tune.grid_search(['tqc'])
+    #     },
+    #     resources_per_trial= {"cpu": 8},
+    #     verbose=2,
+    #     fail_fast=True,
+    # )
+
+    
+
 
     analysis = tune.run(
         training_function,
@@ -185,7 +199,7 @@ if __name__ == "__main__":
             "ars_iters": 200,
             "mdim_trials": 10,
             "agent_folder": agent_folder,
-            "env_name": tune.grid_search(["Pendulum-v0", "MountainCarContinuous-v0"]),
+            "env_name": tune.grid_search(["Pendulum-v0"]),
             "post" : tune.grid_search([None, postprocess_default]),
             "algo": tune.grid_search(['a2c', 'ppo', 'ddpg', 'sac', 'td3','tqc'])
         },
@@ -194,6 +208,24 @@ if __name__ == "__main__":
         fail_fast=True,
     )
 
+
+    
+    # analysis = tune.run(
+    #     training_function,
+    #     config={
+    #         "ars_iters": 200,
+    #         "mdim_trials": 10,
+    #         "agent_folder": agent_folder,
+    #         "env_name": tune.grid_search(["LunarLanderContinuous-v2", "BipedalWalker-v3", "BipedalWalkerHardcore-v3", "Pendulum-v0", "MountainCarContinuous-v0"]),
+    #         "post" : tune.grid_search([None, postprocess_default]),
+    #         "algo": tune.grid_search(['a2c', 'ppo', 'sac', 'td3','tqc', 'ddpg'])
+    #     },
+    #     resources_per_trial= {"cpu": 8},
+    #     verbose=2,
+    #     fail_fast=True,
+    # )
+
+    
     
     #"env_name": tune.grid_search(["Walker2DBulletEnv-v0","HalfCheetahBulletEnv-v0","HopperBulletEnv-v0", "AntBulletEnv-v0", "ReacherBulletEnv-v0"]),
 

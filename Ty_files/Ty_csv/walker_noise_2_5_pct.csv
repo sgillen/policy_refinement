@@ -1,0 +1,9 @@
+post,env,algo,r_mean,r_std,%fail,l_mean
+original,Walker2DBulletEnv-v0,ppo,2105.50980638,15.345420090233786,0.0,1000.0
+original,Walker2DBulletEnv-v0,tqc,2517.3988688599993,567.8205128733968,7.0,944.94
+original,Walker2DBulletEnv-v0,td3,2228.2190133299996,111.0981491706546,12.0,994.84
+original,Walker2DBulletEnv-v0,sac,2264.46716355,227.83389863502484,3.0,988.48
+postprocess_default,Walker2DBulletEnv-v0,ppo,2219.47656109,273.20080823297934,3.0,980.99
+postprocess_default,Walker2DBulletEnv-v0,tqc,2744.32219868,7.325113035692511,0.0,1000.0
+postprocess_default,Walker2DBulletEnv-v0,td3,2444.1829951,7.77202619133566,6.0,999.85
+postprocess_default,Walker2DBulletEnv-v0,sac,2401.658416740001,13.947507107964976,0.0,1000.0

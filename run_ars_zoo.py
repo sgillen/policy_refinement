@@ -131,25 +131,10 @@ if __name__ == "__main__":
 
 
 
-    # analysis = tune.run(
-    #     training_function,
-    #     config={
-    #         "ars_iters": 100,
-    #         "mdim_trials": 10,
-    #         "post" : tune.grid_search([None, mdim_div_stable_nolen, cdim_div_stable_nolen]),
-    #         "mdim_kwargs" : mdim_kwargs,
-    #         "agent_folder": agent_folder,
-    #         "env_name": tune.grid_search(["Walker2DBulletEnv-v0","HalfCheetahBulletEnv-v0","HopperBulletEnv-v0", "AntBulletEnv-v0", "ReacherBulletEnv-v0"]),
-    #         "algo": tune.grid_search(['ppo', 'td3', 'sac', 'tqc'])
-    #     },
-    #     resources_per_trial= {"cpu": 8},
-    #     verbose=2,
-    #     fail_fast=True,
-    # )
-
     mdim_prod = DualRewardProd(mdim_safe_stable_nolen)
     cdim_prod = DualRewardProd(cdim_safe_stable_nolen)
     adim_prod = DualRewardProd(adim_safe_stable_nolen)
+    adim_div = DualRewardDiv(adim_safe_stable_nolen)
 
     a2_lin = DualRewardLin(act_squared, 1, -.2)
     a1_lin = DualRewardLin(act_squared, 1, -.1)
@@ -158,6 +143,26 @@ if __name__ == "__main__":
     #cdim_lin = DualRewardLin(cdim_safe_stable_nolen, 10, .1)
     #adim_lin = DualRewardLin(neg_adim, 10, .5)
 
+
+    
+    analysis = tune.run(
+        training_function,
+        config={
+            "ars_iters": 200,
+            "mdim_trials": 10,
+            "post" : tune.grid_search([None, adim_div]),
+            "mdim_kwargs" : mdim_kwargs,
+            "agent_folder": agent_folder,
+            "env_name": tune.grid_search(["Walker2DBulletEnv-v0","HalfCheetahBulletEnv-v0","HopperBulletEnv-v0", "AntBulletEnv-v0"]),
+            "algo": tune.grid_search(['a2c','ppo','ddpg','td3','sac','tqc'])
+        },
+        resources_per_trial= {"cpu": 8},
+        verbose=2,
+        fail_fast=True,
+    )
+
+    
+    
 
     # analysis = tune.run(
     #     training_function,
@@ -193,20 +198,20 @@ if __name__ == "__main__":
     
 
 
-    analysis = tune.run(
-        training_function,
-        config={
-            "ars_iters": 200,
-            "mdim_trials": 10,
-            "agent_folder": agent_folder,
-            "env_name": tune.grid_search(["Pendulum-v0"]),
-            "post" : tune.grid_search([None, postprocess_default]),
-            "algo": tune.grid_search(['a2c', 'ppo', 'ddpg', 'sac', 'td3','tqc'])
-        },
-        resources_per_trial= {"cpu": 8},
-        verbose=2,
-        fail_fast=True,
-    )
+    # analysis = tune.run(
+    #     training_function,
+    #     config={
+    #         "ars_iters": 200,
+    #         "mdim_trials": 10,
+    #         "agent_folder": agent_folder,
+    #         "env_name": tune.grid_search(["Pendulum-v0"]),
+    #         "post" : tune.grid_search([None, postprocess_default]),
+    #         "algo": tune.grid_search(['a2c', 'ppo', 'ddpg', 'sac', 'td3','tqc'])
+    #     },
+    #     resources_per_trial= {"cpu": 8},
+    #     verbose=2,
+    #     fail_fast=True,
+    # )
 
 
     

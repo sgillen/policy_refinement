@@ -1,3 +1,9 @@
+# This file used to run the trainings found in the paper
+# This file was designed to execture one "run" at a time, below you will find commented out calls to tune.run, each of which corresponds to one "run".
+# Table I from the paper was created with from the results of the first two runs
+# Table II was created seperately, but with the agents from the second call
+# Table III comes from the third run, and table IV comes from the fourth run
+
 import pybullet_envs
 import numpy as np
 import torch
@@ -27,6 +33,7 @@ def training_function(config):
     ars_iters, num_trials = config["ars_iters"], config["mdim_trials"]
     post = config["post"]
     
+    # Not implemented for the baseline
     if ((algo == "ddpg") and (env_name == "BipedalWalkerHardcore-v3")):
         return
 
@@ -36,7 +43,7 @@ def training_function(config):
     
     
     if post is not None:
-        new_agent = ARSZooAgent(env_name, algo, n_workers=8, n_delta=64, postprocessor=post, step_schedule=[0.02, 0.002],  exp_schedule=[0.025, 0.0025], train_all=True, epoch_seed=True)
+        new_agent = ARSZooAgent(env_name, algo, n_workers=8, n_delta=64, postprocessor=post, step_schedule=[0.02, 0.002],  exp_schedule=[0.025, 0.0025], train_all=True)
         new_agent.learn(ars_iters, verbose=True)
         model = new_agent.model
         
@@ -112,30 +119,16 @@ if __name__ == "__main__":
     mdim_kwargs= {"upper_size_ratio":1.0, "lower_size_ratio":0.0}
 
     
-
-    # analysis = tune.run(
-    #     training_function,
-    #     config={
-    #         "ars_iters": 100,
-    #         "mdim_trials": 10,
-    #         "post" : tune.grid_search([None, mdim_div_stable_nolen, cdim_div_stable_nolen]),
-    #         "mdim_kwargs" : mdim_kwargs,
-    #         "agent_folder": agent_folder,
-    #         "env_name": tune.grid_search(["Walker2DBulletEnv-v0", "HalfCheetahBulletEnv-v0", "W"]),
-    #         "algo": tune.grid_search(['ppo'])
-    #     },
-    #     resources_per_trial= {"cpu": 24},
-    #     verbose=2,
-    #     fail_fast=True,
-    # )
-
-
-
+    # mdim and cdim are lower and upper bounds for a trajectory's dimensionality
     mdim_prod = DualRewardProd(mdim_safe_stable_nolen)
     cdim_prod = DualRewardProd(cdim_safe_stable_nolen)
+    
+    # adim is the average of the two bounds for the trajectory's dimensionality
     adim_prod = DualRewardProd(adim_safe_stable_nolen)
     adim_div = DualRewardDiv(adim_safe_stable_nolen)
 
+
+    # Didn't make it into the paper, but these are quadratic action costs
     a2_lin = DualRewardLin(act_squared, 1, -.2)
     a1_lin = DualRewardLin(act_squared, 1, -.1)
     a5_lin = DualRewardLin(act_squared, 1, -.5)
@@ -144,31 +137,69 @@ if __name__ == "__main__":
     #adim_lin = DualRewardLin(neg_adim, 10, .5)
 
 
-    
+    # Box 2D and mountain car
+    # ------------------------------------------------------------------------------
     analysis = tune.run(
-        training_function,
+    training_function,
         config={
             "ars_iters": 200,
-            "mdim_trials": 10,
-            "post" : tune.grid_search([None, adim_div]),
-            "mdim_kwargs" : mdim_kwargs,
+            "mdim_trials": 100,
             "agent_folder": agent_folder,
-            "env_name": tune.grid_search(["Walker2DBulletEnv-v0","HalfCheetahBulletEnv-v0","HopperBulletEnv-v0", "AntBulletEnv-v0"]),
-            "algo": tune.grid_search(['a2c','ppo','ddpg','td3','sac','tqc'])
+            "env_name": tune.grid_search(["LunarLanderContinuous-v2", "BipedalWalker-v3", "BipedalWalkerHardcore-v3", "MountainCarContinuous-v0"]),
+            "post" : tune.grid_search([None, postprocess_default]),
+            "algo": tune.grid_search(['a2c', 'ppo', 'sac', 'td3','tqc', 'ddpg'])
         },
         resources_per_trial= {"cpu": 8},
         verbose=2,
         fail_fast=True,
     )
 
-    
-    
 
+    # Bullet
+    # ------------------------------------------------------------------------------
     # analysis = tune.run(
     #     training_function,
     #     config={
     #         "ars_iters": 200,
-    #         "mdim_trials": 10,
+    #         "mdim_trials": 100,
+    #         "post" : tune.grid_search([None, postprocess_default]),
+    #         "mdim_kwargs" : mdim_kwargs,
+    #         "agent_folder": agent_folder,
+    #         "env_name": tune.grid_search(["Walker2DBulletEnv-v0","HalfCheetahBulletEnv-v0","HopperBulletEnv-v0", "AntBulletEnv-v0"]),
+    #         "algo": tune.grid_search(['a2c','ppo','ddpg','td3','sac','tqc'])
+    #     },
+    #     resources_per_trial= {"cpu": 8},
+    #     verbose=2,
+    #     fail_fast=True,
+    # )
+    
+
+    # # Bullet with dim reward 
+    # # ------------------------------------------------------------------------------
+    # analysis = tune.run(
+    #     training_function,
+    #     config={
+    #         "ars_iters": 200,
+    #         "mdim_trials": 100,
+    #         "post" : tune.grid_search([None, adim_div]),
+    #         "mdim_kwargs" : mdim_kwargs,
+    #         "agent_folder": agent_folder,
+    #         "env_name": tune.grid_search(["Walker2DBulletEnv-v0","HalfCheetahBulletEnv-v0","HopperBulletEnv-v0", "AntBulletEnv-v0"]),
+    #         "algo": tune.grid_search(['a2c','ppo','ddpg','td3','sac','tqc'])
+    #     },
+    #     resources_per_trial= {"cpu": 8},
+    #     verbose=2,
+    #     fail_fast=True,
+    # )
+
+        
+    # # Panda with dim reward
+    # # ------------------------------------------------------------------------------
+    # analysis = tune.run(
+    #     training_function,
+    #     config={
+    #         "ars_iters": 200,
+    #         "mdim_trials": 100,
     #         "agent_folder": agent_folder,
     #         "env_name": tune.grid_search(["PandaReach-v1", "PandaPickAndPlace-v1", "PandaPush-v1", "PandaSlide-v1", "PandaStack-v1"]),
     #         "post" : tune.grid_search([None, postprocess_default, adim_prod, a2_lin]),#, mdim_lin, adim_lin]),
@@ -179,67 +210,7 @@ if __name__ == "__main__":
     #     fail_fast=True,
     # )
 
-
-    # analysis = tune.run(
-    #     training_function,
-    #     config={
-    #         "ars_iters": 200,
-    #         "mdim_trials": 10,
-    #         "agent_folder": agent_folder,
-    #         "env_name": tune.grid_search(["FetchReach-v1", "FetchPickAndPlace-v1", "FetchPush-v1", "FetchSlide-v1"]),
-    #         "post" : tune.grid_search([None, postprocess_default]),#, mdim_lin, adim_lin]),
-    #         "algo": tune.grid_search(['tqc'])
-    #     },
-    #     resources_per_trial= {"cpu": 8},
-    #     verbose=2,
-    #     fail_fast=True,
-    # )
-
     
-
-
-    # analysis = tune.run(
-    #     training_function,
-    #     config={
-    #         "ars_iters": 200,
-    #         "mdim_trials": 10,
-    #         "agent_folder": agent_folder,
-    #         "env_name": tune.grid_search(["Pendulum-v0"]),
-    #         "post" : tune.grid_search([None, postprocess_default]),
-    #         "algo": tune.grid_search(['a2c', 'ppo', 'ddpg', 'sac', 'td3','tqc'])
-    #     },
-    #     resources_per_trial= {"cpu": 8},
-    #     verbose=2,
-    #     fail_fast=True,
-    # )
-
-
-    
-    # analysis = tune.run(
-    #     training_function,
-    #     config={
-    #         "ars_iters": 200,
-    #         "mdim_trials": 10,
-    #         "agent_folder": agent_folder,
-    #         "env_name": tune.grid_search(["LunarLanderContinuous-v2", "BipedalWalker-v3", "BipedalWalkerHardcore-v3", "Pendulum-v0", "MountainCarContinuous-v0"]),
-    #         "post" : tune.grid_search([None, postprocess_default]),
-    #         "algo": tune.grid_search(['a2c', 'ppo', 'sac', 'td3','tqc', 'ddpg'])
-    #     },
-    #     resources_per_trial= {"cpu": 8},
-    #     verbose=2,
-    #     fail_fast=True,
-    # )
-
-    
-    
-    #"env_name": tune.grid_search(["Walker2DBulletEnv-v0","HalfCheetahBulletEnv-v0","HopperBulletEnv-v0", "AntBulletEnv-v0", "ReacherBulletEnv-v0"]),
-
-
-    #"algo": tune.grid_search(['tqc'])
-            
-    # partial(mdim_div_stable, mdim_kwargs=mdim_kwargs),
-        
-    # Get a dataframe for analyzing trial results.
     df = analysis.results_df
     analysis.results_df.to_csv(csv_filename)
     print(f"saved in {csv_filename}")

@@ -1,7 +1,0 @@
-env,algo,fall/100ep before,fall/100ep after
-Walker,A2C,19.33,12.0
-Walker,PPO,0.0,0.33
-Walker,DDPG,42.67,4.0
-Walker,TD3,12.33,1.67
-Walker,SAC,2.33,0.67
-Walker,TQC,5.67,0.0
